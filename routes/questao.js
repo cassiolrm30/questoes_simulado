@@ -3,9 +3,8 @@ const router           = express.Router();
 const TipoSimulado     = require('../models/TipoSimulado');
 const Questao          = require('../models/Questao');
 const Resposta         = require('../models/Resposta');
-const mongoose         = require('mongoose');
 const mensagemNotFound = "Registro não encontrado.";
-const mensagemSucess   = "Dados salvos com sucesso.";
+const mensagemSuccess  = "Dados salvos com sucesso.";
 const chr              = 65;
 
 // GET
@@ -37,127 +36,14 @@ router.get('/:id', async (req, res) =>
         res.status(500).json({ message: err.message });
     }
 });
-    
-// GET/:tipoSimuladoId
+   
+// GET/byTipoSimulado/:tipoSimuladoId
 router.get('/byTipoSimulado/:tipoSimuladoId', async (req, res) =>
 {
     try
     {
         const registros = await Questao.find({ 'tipoSimulado.id': parseInt(req.params.tipoSimuladoId) });
         res.json(registros);
-    }
-    catch (err)
-    {
-        res.status(500).json({ message: err.message });
-    }
-});
-    
-// POST
-router.post('/import', async (req, res) =>
-{
-    try
-    {
-        const tiposSimulados  = await TipoSimulado.find();
-        const questoes        = req.body; //await Questao.find();
-        let mensagem          = "Importação realizada com sucesso.";
-        const opcoesRespostas = [];
-        const fs              = require('fs');
-        const path            = require('path');
-        let itensConteudo = " ".repeat(44) + "{ \"opcao\": \"{8}\", \"descricao\": \"{9}\" }";
-        let conteudo2 = "\n";
-        conteudo2 += "carga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", ";
-        conteudo2 += "\"tipoSimulado\": { \"id\": {2}, \"descricao\": \"{3}\", \"rgbFonte\": \"{4}\", \"rgbFundo\": \"{5}\", \"iniciais\": \"{6}\" }, ";
-        conteudo2 += "\"gabarito\": \"{7}\",\n";
-        conteudo2 += " ".repeat(23) + "\"opcoesRespostas\": [\n";
-    
-        // Diretório específico onde o arquivo será salvo
-        //const dirPath = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
-        const dirPath = path.join(__dirname, "..", "..", "..", "Teste", "Minha Estante (HTML 5)", "carga");
-
-        // Verifica se o diretório existe, se não, cria-o
-        if (!fs.existsSync(dirPath)) { fs.mkdirSync(dirPath, { recursive: true }); }
-
-        // Caminho completo do arquivo
-        //const filePathQuestoes = path.join(dirPath, "questoes.js");
-        const filePathQuestoes = path.join(dirPath, "questoes_teste.js");
-
-        conteudo = "var tipos_simulado = [];\n";
-        for (let i = 0; i < tiposSimulados.length; i++)
-        {
-            linha += "\ntipos_simulado.push( {\"id\": \"{0}\", \"rgbFonte\": \"{1}\", \"rgbFundo\": \"{2}\", \"iniciais\": \"{3}\", \"descricao\": \"{4}\"} );";
-            linha = linha.replace("{0}", tiposSimulados[i].id);
-            linha = linha.replace("{1}", tiposSimulados[i].rgbFonte + " ".repeat(7 - tiposSimulados[i].rgbFonte.length));
-            linha = linha.replace("{2}", tiposSimulados[i].rgbFundo + " ".repeat(7 - tiposSimulados[i].rgbFundo.length));
-            linha = linha.replace("{3}", tiposSimulados[i].iniciais + " ".repeat(10 - tiposSimulados[i].iniciais.length));
-            linha = linha.replace("{4}", tiposSimulados[i].descricao + " ".repeat(50 - tiposSimulados[i].descricao.length));
-            conteudo += linha;
-        }
-
-        conteudo += "\n\nvar carga_questoes = [];\n\n";
-        for (let i = 0; i < questoes.length; i++)
-        {
-            const _questaoId = await getNextId();
-            const _enunciado = (questoes[i].enunciado.length > 1000) ? questoes[i].enunciado.substring(0, 996) + " ..."
-                               : questoes[i].enunciado + " ".repeat(1000 - questoes[i].enunciado.length);
-            //linha += "carga_questoes.push( {\"cod_questao\": \"{0}\", \"cod_tipo_simulado\": \"{1}\", \"dsc_gabarito\": \"{2}\", \"dsc_enunciado\": \"{3}\"} );"; 
-            let linha = conteudo2;
-            /*linha = linha.replace("{0}", _questaoId);
-            linha = linha.replace("{1}", questoes[i].tipoSimuladoId);
-            linha = linha.replace("{2}", questoes[i].gabarito);
-            linha = linha.replace("{3}", _enunciado);
-            conteudo += linha;
-            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
-            {
-                questoes[i].opcoesRespostas[j].questaoId = _questaoId;
-                opcoesRespostas.push(questoes[i].opcoesRespostas[j]);
-            }*/
-            linha = linha.replace("{0}", _questaoId);
-            linha = linha.replace("{1}", questoes[i].tipoSimuladoId);
-            linha = linha.replace("{2}", questoes[i].gabarito);
-            linha = linha.replace("{3}", _enunciado);
-            linha = linha.replace("{4}", questoes[i].tipoSimulado.rgbFonte);
-            linha = linha.replace("{5}", questoes[i].tipoSimulado.rgbFundo);
-            linha = linha.replace("{6}", questoes[i].tipoSimulado.iniciais);
-            linha = linha.replace("{7}", questoes[i].gabarito);
-            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
-            {
-                const _descricao = (questoes[i].opcoesRespostas[j].descricao.length > 500) ?
-                                    questoes[i].opcoesRespostas[j].descricao.substring(0, 496) + " ..." :
-                                    questoes[i].opcoesRespostas[j].descricao + " ".repeat(500 - questoes[i].opcoesRespostas[j].descricao.length);
-                linha += itensConteudo + ((j == questoes[i].opcoesRespostas.length - 1) ? "" : ",") + "\n";
-                linha = linha.replace("{8}", questoes[i].opcoesRespostas[j].opcao);
-                linha = linha.replace("{9}", _descricao);
-            }    
-            conteudo += linha;
-        }
-
-        // Adiciona conteúdo a um arquivo existente
-        fs.appendFile(filePathQuestoes, conteudo, (err) =>
-        {
-            if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
-        });
-
-        /*// Gravação das opções de resposta das questões
-        const filePathAnswers = path.join(dirPath, "opcoes_resposta_teste.js");
-
-        conteudo = "var carga_opcoes_resposta = [];\n\n";
-        for (let i = 0; i < opcoesRespostas.length; i++)
-        {
-            let linha = (i == 0) ? "" : "\n";
-            linha += "carga_opcoes_resposta.push( {\"cod_questao\": \"{0}\", \"cod_resposta\": \"{1}\", \"dsc_opcao_resposta\": \"{2}\"} );";
-            linha = linha.replace("{0}", opcoesRespostas[i].questaoId);
-            linha = linha.replace("{1}", opcoesRespostas[i].codigo);
-            linha = linha.replace("{2}", opcoesRespostas[i].descricao + " ".repeat(50 - tiposSimulados[i].rgbFonte.length));
-            conteudo += linha;
-        }
-
-        // Adiciona conteúdo a um arquivo existente
-        fs.appendFile(filePathAnswers, conteudo, (err) =>
-        {
-            if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
-        });*/
-
-        res.json({ sucesso: true, mensagem, qtd_registros: questoes.length, qtd_cadastros: 0, qtd_atualizacoes: 0 });
     }
     catch (err)
     {
@@ -171,36 +57,31 @@ router.post('/', async (req, res) =>
     try
     {
         let registro = new Questao();
-        let mensagem = mensagemSucess;
-        if ((await Questao.find({ enunciado: req.body.enunciado })).length > 0)
+        let mensagem = mensagemSuccess;
+        if ((await Questao.findOne({ enunciado: req.body.enunciado.trim() })).length > 0)
             mensagem = "Questão já existente.";
         else
         {
-            const tipoSimuladoExistente = await TipoSimulado.find({ id: parseInt(req.body.tipoSimuladoId) });
-            if (tipoSimuladoExistente.length == 0)
+            const tipoSimuladoExistente = await TipoSimulado.findOne({ id: parseInt(req.body.tipoSimuladoId) });
+            if (tipoSimuladoExistente == null)
                 mensagem = "Tipo de simulado não existente.";
             else
             {
                 registro.enunciado = req.body.enunciado;
                 registro.tipoSimulado = tipoSimuladoExistente;
-                if (req.body.gabarito != null)     { registro.gabarito = req.body.gabarito; }
-                registro.id = await getNextId(); //new mongoose.Types.ObjectId();
+                if (req.body.gabarito != null) { registro.gabarito = req.body.gabarito; }
+                registro.id = await getNextId();
                 registro.opcoesRespostas = [];
                 for (let i = 0; i < req.body.opcoesRespostas.length; i++)
                 {
                     let resposta = new Resposta();
-                    //resposta.idQuestao = registro._id;
                     resposta.opcao = String.fromCharCode(chr + i);
                     resposta.descricao = req.body.opcoesRespostas[i];
                     registro.opcoesRespostas.push(resposta);
                 }
                 const resultado = await registro.save();
-                doImport(registro);
-                /*doImport({ id: 0,
-                           enunciado: registro.enunciado,
-                           gabarito: registro.gabarito,
-                           tipoSimulado: registro.tipoSimulado,
-                           opcoesRespostas: registro.opcoesRespostas});*/
+                const registros = await Questao.find();
+                const dadosImportacao = await doImport(registros, 1);
             }
         }
         res.status(201).json({ message: mensagem, registro });
@@ -220,18 +101,18 @@ router.patch('/', async (req, res) =>
         let registro = new Questao();
         let mensagem = "";
         let statusNumber = 500;
-        if ((await Questao.find({ $and: [{ enunciado: req.body.enunciado }, { id: { $ne: parseInt(req.body.id) } }]})).length > 0)
+        if ((await Questao.find({ $and: [{ enunciado: req.body.enunciado.trim() }, { id: { $ne: parseInt(req.body.id) } }]})).length > 0)
             mensagem = "Questão já existente.";
         else
         {
-            const tipoSimuladoExistente = await TipoSimulado.find({ id: parseInt(req.body.tipoSimuladoId) });
-            if (tipoSimuladoExistente.length == 0)
+            const tipoSimuladoExistente = await TipoSimulado.findOne({ id: parseInt(req.body.tipoSimuladoId) });
+            if (tipoSimuladoExistente == null)
                 mensagem = "Tipo de simulado não existente.";
             else
             {
-                if ((await Questao.find({ id: parseInt(req.body.id) })).length == 0)
+                if (await Questao.findOne({ id: parseInt(req.body.id) }) == null)
                     return res.status(404).json({ message: mensagemNotFound });
-                mensagem = mensagemSucess;
+                mensagem = mensagemSuccess;
                 statusNumber = 201;
                 let opcoesRespostas = [];
                 for (let i = 0; i < req.body.opcoesRespostas.length; i++)
@@ -244,15 +125,11 @@ router.patch('/', async (req, res) =>
                 registro = await Questao.findOneAndUpdate({ id: parseInt(req.body.id) },
                                                           { $set: { enunciado: req.body.enunciado,
                                                                     gabarito: req.body.gabarito,
-                                                                    tipoSimulado: tipoSimuladoExistente[0],
+                                                                    tipoSimulado: tipoSimuladoExistente,
                                                                     respostas: opcoesRespostas } },
                                                           { new: true });
-                doImport(registro);
-                /*doImport({ id: registro.id,
-                           enunciado: registro.enunciado,
-                           gabarito: registro.gabarito,
-                           tipoSimulado: registro.tipoSimulado,
-                           opcoesRespostas: registro.opcoesRespostas});*/
+                const registros = await Questao.find();
+                const dadosImportacao = await doImport(registros, 1);
             }
         }
         res.status(statusNumber).json({ message: mensagem, registro });
@@ -270,26 +147,181 @@ router.delete('/:id', async (req, res) =>
     {
         const registro = await Questao.findOneAndDelete({ id: parseInt(req.params.id) });
         if (registro == null) { return res.status(404).json({ message: mensagemNotFound }); }
-        res.json({ message: "Dados excluídos com sucesso.", resultado });
+        const registros = await Questao.find();
+        const dadosImportacao = await doImport(registros, 1);
+        res.json({ message: "Dados excluídos com sucesso.", registro });
     }
     catch (err)
     {
         res.status(500).json({ message: err.message });
     }
 });
-    
-// PATCH (PUT)/:id
+
+async function getNextId()
+{
+  const lastId = await Questao.findOne().sort({ id: -1 });
+  return lastId ? lastId.id + 1 : 1;
+}
+
+// POST
+router.post('/import', async (req, res) =>
+{
+    const resultado = await doImport(req.body.dadosImportacao, 0);
+    res.json(resultado);
+});
+
+async function doImport(questoes, opcao)
+{
+    try
+    {
+        const path             = require('path');
+        const dirPath          = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
+        const caminhoArquivo   = "questoes_teste.js";                // "questoes.js"
+        const filePathQuestoes = path.join(dirPath, caminhoArquivo); // Caminho completo do arquivo
+        const fs               = require('fs');
+        const mensagem         = "Importação realizada com sucesso.";
+        const identacao1       = " ".repeat(23);
+        const identacao2       = " ".repeat(42);
+        const identacao3       = " ".repeat(44);
+        const tiposSimulados   = await TipoSimulado.find();
+        const questoesNovas    = [];
+        const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
+        const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
+        const formatoTxtOpcaoResposta = "\n{0}{ \"opcao\": \"{1}\", \"descricao\": \"{2}\" },";
+
+        let qtdCadastros       = 0;
+        let qtdAtualizacoes    = 0;
+        let TAM_tipoSimuladoId = 0;
+        let TAM_rgbFonte       = 0;
+        let TAM_rgbFundo       = 0;
+        let TAM_iniciais       = 0;
+        let TAM_descricao      = 0;
+        let conteudo           = "";
+
+        for (let i = 0; i < tiposSimulados.length; i++)
+        {
+            if (tiposSimulados[i].id.toString().length > TAM_tipoSimuladoId) { TAM_tipoSimuladoId = tiposSimulados[i].id.toString().length; }
+            if (tiposSimulados[i].rgbFonte.length > TAM_rgbFonte)            { TAM_rgbFonte       = tiposSimulados[i].rgbFonte.length;      }
+            if (tiposSimulados[i].rgbFundo.length > TAM_rgbFundo)            { TAM_rgbFundo       = tiposSimulados[i].rgbFundo.length;      }
+            if (tiposSimulados[i].iniciais.length > TAM_iniciais)            { TAM_iniciais       = tiposSimulados[i].iniciais.length;      }
+            if (tiposSimulados[i].descricao.length > TAM_descricao)          { TAM_descricao      = tiposSimulados[i].descricao.length;     }
+        }
+   
+        conteudo = "var tipos_simulado = [];\n";
+        for (let i = 0; i < tiposSimulados.length; i++)
+        {
+            let formato = "\ntipos_simulado.push( {\"id\": {0}, \"rgbFonte\": \"{1}\", \"rgbFundo\": \"{2}\", \"iniciais\": \"{3}\", \"descricao\": \"{4}\"} );";
+            formato = formato.replace("{0}", " ".repeat(TAM_tipoSimuladoId - tiposSimulados[i].id.toString().length) + tiposSimulados[i].id.toString());
+            formato = formato.replace("{1}", tiposSimulados[i].rgbFonte + " ".repeat(TAM_rgbFonte - tiposSimulados[i].rgbFonte.length));
+            formato = formato.replace("{2}", tiposSimulados[i].rgbFundo + " ".repeat(TAM_rgbFundo - tiposSimulados[i].rgbFundo.length));
+            formato = formato.replace("{3}", tiposSimulados[i].iniciais + " ".repeat(TAM_iniciais - tiposSimulados[i].iniciais.length));
+            formato = formato.replace("{4}", tiposSimulados[i].descricao.trim() + " ".repeat(TAM_descricao - tiposSimulados[i].descricao.trim().length));
+            conteudo += formato;
+        }
+
+        let TAM_questaoId = 0;
+        let TAM_enunciado = 0;
+        for (let i = 0; i < questoes.length; i++)
+        {
+            if (questoes[i].id.toString().length > TAM_questaoId) { TAM_questaoId = questoes[i].id.toString().length; }
+            if (questoes[i].enunciado.length > TAM_enunciado)     { TAM_enunciado = questoes[i].enunciado.length;     }
+        }
+   
+        let _id = 0;
+        let _questaoId = await getNextId();
+        conteudo += "\n\nvar carga_questoes = [];\n";
+
+        if (questoes.length == 0)
+            questoes = await Questao.find();
+
+        for (let i = 0; i < questoes.length; i++)
+        {
+            const _tipoSimulado = await TipoSimulado.findOne({ id: parseInt(questoes[i].tipoSimuladoId) });
+            if (parseInt(questoes[i].id) == 0)
+            {
+                _id = _questaoId;
+                questoes[i].id = _questaoId;
+                questoesNovas.push(questoes[i]);
+                _questaoId++;
+                qtdCadastros++;
+            }
+            else
+            {
+                _id = parseInt(questoes[i].id);
+                qtdAtualizacoes++;
+            }
+   
+            /*let formatoTS = formatoTxtTipoSimulado.replace("{0}", " ".repeat(TAM_tipoSimuladoId - _tipoSimulado.id.toString().length) + _tipoSimulado.id.toString())
+                                                  .replace("{1}", _tipoSimulado.descricao.trim() + " ".repeat(TAM_descricao - _tipoSimulado.descricao.trim().length))
+                                                  .replace("{2}", _tipoSimulado.rgbFonte + " ".repeat(TAM_rgbFonte - _tipoSimulado.rgbFonte.length))
+                                                  .replace("{3}", _tipoSimulado.rgbFundo + " ".repeat(TAM_rgbFundo - _tipoSimulado.rgbFundo.length))
+                                                  .replace("{4}", _tipoSimulado.iniciais + " ".repeat(TAM_iniciais - _tipoSimulado.iniciais.length));
+
+            let formatoOR = "";
+            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
+            {
+                formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
+                                                    .replace("{1}", questoes[i].opcoesRespostas[j].opcao)
+                                                    .replace("{2}", questoes[i].opcoesRespostas[j].descricao);
+            }
+            formatoOR += "\n" + identacao2;
+
+            let formato = formatoTxtQuestao.replace("{0}", _id)
+                                           .replace("{1}", questoes[i].enunciado.trim() + " ".repeat(TAM_enunciado - questoes[i].enunciado.trim().length))
+                                           .replace("{2}", formatoTS)
+                                           .replace("{3}", questoes[i].gabarito)
+                                           .replace("{4}", identacao1)
+                                           .replace("{5}", formatoOR);
+            _id++;
+            conteudo += formato;*/
+        }
+
+        if (opcao == 0)
+        {
+            const resultado = await Questao.bulkWrite(
+                                questoesNovas.map(questao =>
+                                ({
+                                    updateOne:
+                                    {
+                                        filter: { enunciado: questao.enunciado.trim() },
+                                        update: { $set: questao },
+                                        upsert: true
+                                    }
+                                }))
+            );
+            //console.log(resultado);
+        }
+   
+        // Limpando o conteúdo do arquivo
+        await fs.promises.writeFile(filePathQuestoes, "", "utf8");
+
+        // Adiciona conteúdo a um arquivo existente
+        fs.appendFile(filePathQuestoes, conteudo, (err) =>
+        {
+            if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
+        });
+
+        return ({ sucesso: true, mensagem, qtd_registros: questoes.length, qtd_cadastros: qtdCadastros, qtd_atualizacoes: qtdAtualizacoes });
+    }
+    catch (err)
+    {
+        return ({ sucesso: false, mensagem: err.message, qtd_registros: 0, qtd_cadastros: 0, qtd_atualizacoes: 0 });
+    }
+}
+
+// POST
 router.post('/excel', async (req, res) =>
 {
     try
     {
-        const registro = new Questao();
+        const mensagem = "Importação realizada com sucesso.";
+        /*const registro = new Questao();
         const extensaoArquivo = "xlsx";
-        const nomeArquivo = "carga_teste." + extensaoArquivo;
+        const nomeArquivo2 = "carga_teste." + extensaoArquivo;
         const XLSX = require(extensaoArquivo);
 
         // Lê o arquivo Excel existente
-        const workbook = XLSX.readFile(nomeArquivo);
+        const workbook = XLSX.readFile(nomeArquivo2);
         const worksheetQuestions = "Questões de Concursos";
         const worksheetQuestionAnswers = "Opções de Resposta de Questões";
         //["cod_questao", "cod_resposta", "dsc_opcao_resposta"]
@@ -298,9 +330,9 @@ router.post('/excel', async (req, res) =>
         if (req.body.gabarito != null)     { registro.gabarito = req.body.gabarito; }
         if (req.body.enunciado != null)    { registro.enunciado = req.body.enunciado; }
         if (req.body.tipoSimulado != null)
-            registro.tipoSimulado = new TipoSimulado({ id: req.body.tipoSimulado, rgbFonte: null, rgbFundo: null, 
+            registro.tipoSimulado = new TipoSimulado({ id: req.body.tipoSimulado, rgbFonte: null, rgbFundo: null,
                                                         iniciais: null, descricao: null });
-        registro.respostas = (req.body.respostas != null) ? req.body.respostas : [];
+        registro.opcoesRespostas = (req.body.opcoesRespostas != null) ? req.body.opcoesRespostas : [];
 
         for (let i = 0; i < workbook.SheetNames.length; i++)
         {
@@ -327,127 +359,15 @@ router.post('/excel', async (req, res) =>
         // XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(data2), "Minha Planilha 4");
 
         // Salva o arquivo Excel com as alterações
-        XLSX.writeFile(workbook, nomeArquivo);
-        console.log('Dados inseridos e arquivo atualizado com sucesso!');
+        XLSX.writeFile(workbook, nomeArquivo2);
+        console.log('Dados inseridos e arquivo atualizado com sucesso!');*/
 
-        res.json({ message: mensagemSucess, resultado });
+        res.json({ message: mensagem, resultado });
     }
     catch (err)
     {
         res.status(400).json({ message: err.message });
     }
 });
-
-async function getNextId()
-{
-  const lastId = await Questao.findOne().sort({ id: -1 });
-  return lastId ? lastId.id + 1 : 1;
-}
-
-async function doImport(questao)
-{
-    const fs   = require('fs');
-    const path = require('path');
-
-    // Diretório específico onde o arquivo será salvo
-    const dirPath = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
-    //const dirPath = path.join(__dirname, "..", "..", "..", "Teste", "Minha Estante (HTML 5)", "carga");
-
-    const caminhoArquivo = path.join(dirPath, "questoes_teste.js");
-
-    let itensConteudo = " ".repeat(44) + "{ \"opcao\": \"{8}\", \"descricao\": \"{9}\" }";
-    let conteudo = "\n";
-    conteudo += "carga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", ";
-    conteudo += "\"tipoSimulado\": { \"id\": {2}, \"descricao\": \"{3}\", \"rgbFonte\": \"{4}\", \"rgbFundo\": \"{5}\", \"iniciais\": \"{6}\" }, ";
-    conteudo += "\"gabarito\": \"{7}\",\n";
-    conteudo += " ".repeat(23) + "\"opcoesRespostas\": [\n";
-
-    // Verifica se o diretório existe, se não, cria-o
-    if (!fs.existsSync(dirPath)) { fs.mkdirSync(dirPath, { recursive: true }); }
-
-    const _enunciado = (questao.enunciado.length > 1000) ? questao.enunciado.substring(0, 996) + " ..." :
-                        questao.enunciado + " ".repeat(1000 - questao.enunciado.length);
-
-    if (questao.id == 0)
-    {
-        conteudo = conteudo.replace("{0}", await getNextId());
-        conteudo = conteudo.replace("{1}", _enunciado);
-        conteudo = conteudo.replace("{2}", questao.tipoSimulado.id);
-        conteudo = conteudo.replace("{3}", questao.tipoSimulado.descricao + " ".repeat(7 - questao.tipoSimulado.descricao.length));
-        conteudo = conteudo.replace("{4}", questao.tipoSimulado.rgbFonte + " ".repeat(7 - questao.tipoSimulado.rgbFonte.length));
-        conteudo = conteudo.replace("{5}", questao.tipoSimulado.rgbFundo + " ".repeat(10 - questao.tipoSimulado.rgbFundo.length));
-        conteudo = conteudo.replace("{6}", questao.tipoSimulado.iniciais + " ".repeat(50 - questao.tipoSimulado.iniciais.length));
-        conteudo = conteudo.replace("{7}", questao.gabarito);
-        for (let j = 0; j < questao.opcoesRespostas.length; j++)
-        {
-            const _descricao = (questao.opcoesRespostas[j].descricao.length > 500) ?
-                                questao.opcoesRespostas[j].descricao.substring(0, 496) + " ..." :
-                                questao.opcoesRespostas[j].descricao + " ".repeat(500 - questao.opcoesRespostas[j].descricao.length);
-            conteudo += itensConteudo + ((j == questao.opcoesRespostas.length - 1) ? "" : ",") + "\n";
-            conteudo = conteudo.replace("{8}", questao.opcoesRespostas[j].opcao);
-            conteudo = conteudo.replace("{9}", _descricao);
-        }
-    }
-    else
-    {
-        // Limpando o conteúdo do arquivo
-        await fs.promises.writeFile(caminhoArquivo, '', 'utf8');
-
-        const tiposSimulados = await TipoSimulado.find();
-
-        inicioConteudo = "var tipos_simulado = [];\n";
-        for (let i = 0; i < tiposSimulados.length; i++)
-        {
-            let linha = "\ntipos_simulado.push( {\"id\": \"{0}\", \"rgbFonte\": \"{1}\", \"rgbFundo\": \"{2}\", \"iniciais\": \"{3}\", \"descricao\": \"{4}\"} );";
-            linha = linha.replace("{0}", tiposSimulados[i].id);
-            linha = linha.replace("{1}", tiposSimulados[i].rgbFonte + " ".repeat(7 - tiposSimulados[i].rgbFonte.length));
-            linha = linha.replace("{2}", tiposSimulados[i].rgbFundo + " ".repeat(7 - tiposSimulados[i].rgbFundo.length));
-            linha = linha.replace("{3}", tiposSimulados[i].iniciais + " ".repeat(10 - tiposSimulados[i].iniciais.length));
-            linha = linha.replace("{4}", tiposSimulados[i].descricao + " ".repeat(50 - tiposSimulados[i].descricao.length));
-            inicioConteudo += linha;
-        }
-
-        inicioConteudo += "\n\nvar carga_questoes = [];\n";
-
-        // Ler do banco de dados os registros
-        const registros = await Questao.find();
-        for (let i = 0; i < registros.length; i++)
-        {
-            // Atualizar a linha específica
-            if (registros[i].id == questao.id)
-            {
-                registros[i].enunciado    = _enunciado;
-                registros[i].gabarito     = questao.gabarito;
-                registros[i].tipoSimulado = questao.tipoSimulado;
-                registros[i].respostas    = questao.opcoesRespostas;
-            }
-            conteudo = conteudo.replace("{0}", registros[i].id);
-            conteudo = conteudo.replace("{1}", registros[i].enunciado);
-            conteudo = conteudo.replace("{2}", registros[i].tipoSimulado.id);
-            conteudo = conteudo.replace("{3}", registros[i].tipoSimulado.descricao + " ".repeat(7 - registros[i].tipoSimulado.descricao.length));
-            conteudo = conteudo.replace("{4}", registros[i].tipoSimulado.rgbFonte + " ".repeat(7 - registros[i].tipoSimulado.rgbFonte.length));
-            conteudo = conteudo.replace("{5}", registros[i].tipoSimulado.rgbFundo + " ".repeat(10 - registros[i].tipoSimulado.rgbFundo.length));
-            conteudo = conteudo.replace("{6}", registros[i].tipoSimulado.iniciais + " ".repeat(50 - registros[i].tipoSimulado.iniciais.length));
-            conteudo = conteudo.replace("{7}", registros[i].gabarito);
-            for (let j = 0; j < registros[i].opcoesRespostas.length; j++)
-            {
-                const _descricao = (questao.opcoesRespostas[j].descricao.length > 500) ?
-                                    questao.opcoesRespostas[j].descricao.substring(0, 496) + " ..." :
-                                    questao.opcoesRespostas[j].descricao + " ".repeat(500 - questao.opcoesRespostas[j].descricao.length);
-                conteudo += itensConteudo + ((j == registros[i].opcoesRespostas.length - 1) ? "" : ",") + "\n";
-                conteudo = conteudo.replace("{8}", registros[i].opcoesRespostas[j].opcao);
-                conteudo = conteudo.replace("{9}", _descricao);
-            }
-        }
-        conteudo = inicioConteudo + conteudo;
-    }
-    conteudo += " ".repeat(42) + "] } );";
-
-    // Adiciona conteúdo a um arquivo existente com caminho completo
-    fs.appendFile(caminhoArquivo, conteudo, (err) =>
-    {
-        //if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
-    });
-}
 
 module.exports = router;
