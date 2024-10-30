@@ -184,6 +184,8 @@ async function doImport(questoes, opcao)
         const identacao2       = " ".repeat(42);
         const identacao3       = " ".repeat(44);
         const tiposSimulados   = await TipoSimulado.find();
+        const questoesIDs      = await Questao.find(null, { id: 1 }).sort({ id: 1 });
+        const tiposSimuladosIDs= [];
         const questoesNovas    = [];
         const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
         const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
@@ -191,6 +193,7 @@ async function doImport(questoes, opcao)
 
         let qtdCadastros       = 0;
         let qtdAtualizacoes    = 0;
+        let qtdInvalidos       = 0;
         let TAM_tipoSimuladoId = 0;
         let TAM_rgbFonte       = 0;
         let TAM_rgbFundo       = 0;
@@ -205,6 +208,7 @@ async function doImport(questoes, opcao)
             if (tiposSimulados[i].rgbFundo.length > TAM_rgbFundo)            { TAM_rgbFundo       = tiposSimulados[i].rgbFundo.length;      }
             if (tiposSimulados[i].iniciais.length > TAM_iniciais)            { TAM_iniciais       = tiposSimulados[i].iniciais.length;      }
             if (tiposSimulados[i].descricao.length > TAM_descricao)          { TAM_descricao      = tiposSimulados[i].descricao.length;     }
+            tiposSimuladosIDs.push(tiposSimulados[i].id);
         }
    
         conteudo = "var tipos_simulado = [];\n";
@@ -227,56 +231,68 @@ async function doImport(questoes, opcao)
             if (questoes[i].enunciado.length > TAM_enunciado)     { TAM_enunciado = questoes[i].enunciado.length;     }
         }
    
-        let _id = 0;
-        let _questaoId = await getNextId();
-        conteudo += "\n\nvar carga_questoes = [];\n";
+        console.log(questoesIDs);
+        //console.log(tiposSimuladosIDs);
 
-        if (questoes.length == 0)
-            questoes = await Questao.find();
+        //let _id = 0;
+        //let _questaoId = await getNextId();
+        conteudo += "\n\nvar carga_questoes = [];\n";
 
         for (let i = 0; i < questoes.length; i++)
         {
-            const _tipoSimulado = await TipoSimulado.findOne({ id: parseInt(questoes[i].tipoSimuladoId) });
-            if (parseInt(questoes[i].id) == 0)
+            if (!tiposSimuladosIDs.includes(parseInt(questoes[i].tipoSimuladoId)))
             {
-                _id = _questaoId;
-                questoes[i].id = _questaoId;
-                questoesNovas.push(questoes[i]);
-                _questaoId++;
-                qtdCadastros++;
+                qtdInvalidos++;
             }
             else
             {
-                _id = parseInt(questoes[i].id);
-                qtdAtualizacoes++;
-            }
-   
-            /*let formatoTS = formatoTxtTipoSimulado.replace("{0}", " ".repeat(TAM_tipoSimuladoId - _tipoSimulado.id.toString().length) + _tipoSimulado.id.toString())
-                                                  .replace("{1}", _tipoSimulado.descricao.trim() + " ".repeat(TAM_descricao - _tipoSimulado.descricao.trim().length))
-                                                  .replace("{2}", _tipoSimulado.rgbFonte + " ".repeat(TAM_rgbFonte - _tipoSimulado.rgbFonte.length))
-                                                  .replace("{3}", _tipoSimulado.rgbFundo + " ".repeat(TAM_rgbFundo - _tipoSimulado.rgbFundo.length))
-                                                  .replace("{4}", _tipoSimulado.iniciais + " ".repeat(TAM_iniciais - _tipoSimulado.iniciais.length));
+                if (questoes[i].opcoesRespostas.length < 2 || questoes[i].opcoesRespostas.length > 5)
+                {
+                    qtdInvalidos++;
+                }
+                else
+                {
+                    questoesNovas.push(questoes[i]);
+                    if (questoesIDs.includes(parseInt(questoes[i].id)))
+                    {
+                        //_id = parseInt(questoes[i].id);
+                        qtdAtualizacoes++;
+                    }
+                    else
+                    {
+                        //_id = _questaoId;
+                        //questoes[i].id = _questaoId;
+                        //_questaoId++;
+                        qtdCadastros++;
+                    }
+                    /*let formatoTS = formatoTxtTipoSimulado.replace("{0}", " ".repeat(TAM_tipoSimuladoId - _tipoSimulado.id.toString().length) + _tipoSimulado.id.toString())
+                                                        .replace("{1}", _tipoSimulado.descricao.trim() + " ".repeat(TAM_descricao - _tipoSimulado.descricao.trim().length))
+                                                        .replace("{2}", _tipoSimulado.rgbFonte + " ".repeat(TAM_rgbFonte - _tipoSimulado.rgbFonte.length))
+                                                        .replace("{3}", _tipoSimulado.rgbFundo + " ".repeat(TAM_rgbFundo - _tipoSimulado.rgbFundo.length))
+                                                        .replace("{4}", _tipoSimulado.iniciais + " ".repeat(TAM_iniciais - _tipoSimulado.iniciais.length));
 
-            let formatoOR = "";
-            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
-            {
-                formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
-                                                    .replace("{1}", questoes[i].opcoesRespostas[j].opcao)
-                                                    .replace("{2}", questoes[i].opcoesRespostas[j].descricao);
-            }
-            formatoOR += "\n" + identacao2;
+                    let formatoOR = "";
+                    for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
+                    {
+                        formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
+                                                            .replace("{1}", questoes[i].opcoesRespostas[j].opcao)
+                                                            .replace("{2}", questoes[i].opcoesRespostas[j].descricao);
+                    }
+                    formatoOR += "\n" + identacao2;
 
-            let formato = formatoTxtQuestao.replace("{0}", _id)
-                                           .replace("{1}", questoes[i].enunciado.trim() + " ".repeat(TAM_enunciado - questoes[i].enunciado.trim().length))
-                                           .replace("{2}", formatoTS)
-                                           .replace("{3}", questoes[i].gabarito)
-                                           .replace("{4}", identacao1)
-                                           .replace("{5}", formatoOR);
-            _id++;
-            conteudo += formato;*/
+                    let formato = formatoTxtQuestao.replace("{0}", _id)
+                                                .replace("{1}", questoes[i].enunciado.trim() + " ".repeat(TAM_enunciado - questoes[i].enunciado.trim().length))
+                                                .replace("{2}", formatoTS)
+                                                .replace("{3}", questoes[i].gabarito)
+                                                .replace("{4}", identacao1)
+                                                .replace("{5}", formatoOR);
+                    //_id++;
+                    conteudo += formato;*/
+                }
+            }
         }
 
-        if (opcao == 0)
+        /*if (opcao == 0)
         {
             const resultado = await Questao.bulkWrite(
                                 questoesNovas.map(questao =>
@@ -290,7 +306,7 @@ async function doImport(questoes, opcao)
                                 }))
             );
             //console.log(resultado);
-        }
+        }*/
    
         // Limpando o conteúdo do arquivo
         await fs.promises.writeFile(filePathQuestoes, "", "utf8");
@@ -301,11 +317,11 @@ async function doImport(questoes, opcao)
             if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
         });
 
-        return ({ sucesso: true, mensagem, qtd_registros: questoes.length, qtd_cadastros: qtdCadastros, qtd_atualizacoes: qtdAtualizacoes });
+        return ({ sucesso: true, mensagem, qtd_registros: questoes.length, qtd_cadastros: qtdCadastros, qtd_atualizacoes: qtdAtualizacoes, qtd_invalidos: qtdInvalidos });
     }
     catch (err)
     {
-        return ({ sucesso: false, mensagem: err.message, qtd_registros: 0, qtd_cadastros: 0, qtd_atualizacoes: 0 });
+        return ({ sucesso: false, mensagem: err.message, qtd_registros: 0, qtd_cadastros: 0, qtd_atualizacoes: 0, qtd_invalidos: 0 });
     }
 }
 
