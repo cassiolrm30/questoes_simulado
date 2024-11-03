@@ -36,7 +36,7 @@ router.get('/:id', async (req, res) =>
         res.status(500).json({ message: err.message });
     }
 });
-   
+
 // GET/byTipoSimulado/:tipoSimuladoId
 router.get('/byTipoSimulado/:tipoSimuladoId', async (req, res) =>
 {
@@ -84,6 +84,7 @@ router.post('/', async (req, res) =>
                 const dadosImportacao = await doImport(registros, 1);
             }
         }
+
         res.status(201).json({ message: mensagem, registro });
     }
     catch (err)
@@ -159,8 +160,8 @@ router.delete('/:id', async (req, res) =>
 
 async function getNextId()
 {
-  const lastId = await Questao.findOne().sort({ id: -1 });
-  return lastId ? lastId.id + 1 : 1;
+	const lastId = await Questao.findOne().sort({ id: -1 });
+	return lastId ? lastId.id + 1 : 1;
 }
 
 // POST
@@ -170,159 +171,201 @@ router.post('/import', async (req, res) =>
     res.json(resultado);
 });
 
-async function doImport(questoes, opcao)
+async function doImport(cargaImportacao, opcao)
 {
-    try
+    let resultado = null;
+    let sucesso   = true;
+    let mensagem  = "";
+    let qtdCadastros = 0, qtdAtualizacoes = 0, qtdInvalidos = 0;
+    if (cargaImportacao.length == 0)
     {
-        const path             = require('path');
-        const dirPath          = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
-        const caminhoArquivo   = "questoes_teste.js";                // "questoes.js"
-        const filePathQuestoes = path.join(dirPath, caminhoArquivo); // Caminho completo do arquivo
-        const fs               = require('fs');
-        const mensagem         = "Importação realizada com sucesso.";
-        const identacao1       = " ".repeat(23);
-        const identacao2       = " ".repeat(42);
-        const identacao3       = " ".repeat(44);
-        const tiposSimulados   = await TipoSimulado.find();
-        const questoesIDs      = await Questao.find(null, { id: 1 }).sort({ id: 1 });
-        const tiposSimuladosIDs= [];
-        const questoesNovas    = [];
-        const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
-        const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
-        const formatoTxtOpcaoResposta = "\n{0}{ \"opcao\": \"{1}\", \"descricao\": \"{2}\" },";
-
-        let qtdCadastros       = 0;
-        let qtdAtualizacoes    = 0;
-        let qtdInvalidos       = 0;
-        let TAM_tipoSimuladoId = 0;
-        let TAM_rgbFonte       = 0;
-        let TAM_rgbFundo       = 0;
-        let TAM_iniciais       = 0;
-        let TAM_descricao      = 0;
-        let conteudo           = "";
-
-        for (let i = 0; i < tiposSimulados.length; i++)
+        sucesso = false; mensagem = "Carga de importação vazia!";
+    }
+    else
+    {
+        try
         {
-            if (tiposSimulados[i].id.toString().length > TAM_tipoSimuladoId) { TAM_tipoSimuladoId = tiposSimulados[i].id.toString().length; }
-            if (tiposSimulados[i].rgbFonte.length > TAM_rgbFonte)            { TAM_rgbFonte       = tiposSimulados[i].rgbFonte.length;      }
-            if (tiposSimulados[i].rgbFundo.length > TAM_rgbFundo)            { TAM_rgbFundo       = tiposSimulados[i].rgbFundo.length;      }
-            if (tiposSimulados[i].iniciais.length > TAM_iniciais)            { TAM_iniciais       = tiposSimulados[i].iniciais.length;      }
-            if (tiposSimulados[i].descricao.length > TAM_descricao)          { TAM_descricao      = tiposSimulados[i].descricao.length;     }
-            tiposSimuladosIDs.push(tiposSimulados[i].id);
-        }
-   
-        conteudo = "var tipos_simulado = [];\n";
-        for (let i = 0; i < tiposSimulados.length; i++)
-        {
-            let formato = "\ntipos_simulado.push( {\"id\": {0}, \"rgbFonte\": \"{1}\", \"rgbFundo\": \"{2}\", \"iniciais\": \"{3}\", \"descricao\": \"{4}\"} );";
-            formato = formato.replace("{0}", " ".repeat(TAM_tipoSimuladoId - tiposSimulados[i].id.toString().length) + tiposSimulados[i].id.toString());
-            formato = formato.replace("{1}", tiposSimulados[i].rgbFonte + " ".repeat(TAM_rgbFonte - tiposSimulados[i].rgbFonte.length));
-            formato = formato.replace("{2}", tiposSimulados[i].rgbFundo + " ".repeat(TAM_rgbFundo - tiposSimulados[i].rgbFundo.length));
-            formato = formato.replace("{3}", tiposSimulados[i].iniciais + " ".repeat(TAM_iniciais - tiposSimulados[i].iniciais.length));
-            formato = formato.replace("{4}", tiposSimulados[i].descricao.trim() + " ".repeat(TAM_descricao - tiposSimulados[i].descricao.trim().length));
-            conteudo += formato;
-        }
+            const path              = require('path');
+            const dirPath           = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
+            const caminhoArquivo    = path.join(dirPath, "questoes_teste.js"); // Caminho completo do arquivo "questoes.js"
+            const fs                = require('fs');
+            const identacao1        = " ".repeat(23);
+            const identacao2        = " ".repeat(42);
+            const identacao3        = " ".repeat(44);
+            const tiposSimulados    = await TipoSimulado.find();
+            const questoesBD        = await Questao.find(null, { id: 1 }).sort({ id: 1 });
+            //const questoesBD      = await Questao.countDocuments();
+            const questoesIDs       = [];
+            const tiposSimuladosIDs = [];
+            const questoesValidas   = [];
+            const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
+            const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
+            const formatoTxtOpcaoResposta = "\n{0}{ \"opcao\": \"{1}\", \"descricao\": \"{2}\" },";
 
-        let TAM_questaoId = 0;
-        let TAM_enunciado = 0;
-        for (let i = 0; i < questoes.length; i++)
-        {
-            if (questoes[i].id.toString().length > TAM_questaoId) { TAM_questaoId = questoes[i].id.toString().length; }
-            if (questoes[i].enunciado.length > TAM_enunciado)     { TAM_enunciado = questoes[i].enunciado.length;     }
-        }
-   
-        console.log(questoesIDs);
-        //console.log(tiposSimuladosIDs);
+            let TAM_tipoSimuladoId = 0;
+            let TAM_rgbFonte       = 0;
+            let TAM_rgbFundo       = 0;
+            let TAM_iniciais       = 0;
+            let TAM_descricao      = 0;
+            let conteudo           = "";
 
-        //let _id = 0;
-        //let _questaoId = await getNextId();
-        conteudo += "\n\nvar carga_questoes = [];\n";
-
-        for (let i = 0; i < questoes.length; i++)
-        {
-            if (!tiposSimuladosIDs.includes(parseInt(questoes[i].tipoSimuladoId)))
+            for (let i = 0; i < tiposSimulados.length; i++)
             {
-                qtdInvalidos++;
+                if (tiposSimulados[i].id.toString().length > TAM_tipoSimuladoId) { TAM_tipoSimuladoId = tiposSimulados[i].id.toString().length; }
+                if (tiposSimulados[i].rgbFonte.length > TAM_rgbFonte)            { TAM_rgbFonte       = tiposSimulados[i].rgbFonte.length;      }
+                if (tiposSimulados[i].rgbFundo.length > TAM_rgbFundo)            { TAM_rgbFundo       = tiposSimulados[i].rgbFundo.length;      }
+                if (tiposSimulados[i].iniciais.length > TAM_iniciais)            { TAM_iniciais       = tiposSimulados[i].iniciais.length;      }
+                if (tiposSimulados[i].descricao.length > TAM_descricao)          { TAM_descricao      = tiposSimulados[i].descricao.length;     }
+                tiposSimuladosIDs.push(tiposSimulados[i].id);
             }
-            else
+
+            conteudo = "var tipos_simulado = [];\n";
+            for (let i = 0; i < tiposSimulados.length; i++)
             {
-                if (questoes[i].opcoesRespostas.length < 2 || questoes[i].opcoesRespostas.length > 5)
+                let formato = "\ntipos_simulado.push( {\"id\": {0}, \"rgbFonte\": \"{1}\", \"rgbFundo\": \"{2}\", \"iniciais\": \"{3}\", \"descricao\": \"{4}\"} );";
+                formato = formato.replace("{0}", " ".repeat(TAM_tipoSimuladoId - tiposSimulados[i].id.toString().length) + tiposSimulados[i].id.toString());
+                formato = formato.replace("{1}", tiposSimulados[i].rgbFonte + " ".repeat(TAM_rgbFonte - tiposSimulados[i].rgbFonte.length));
+                formato = formato.replace("{2}", tiposSimulados[i].rgbFundo + " ".repeat(TAM_rgbFundo - tiposSimulados[i].rgbFundo.length));
+                formato = formato.replace("{3}", tiposSimulados[i].iniciais + " ".repeat(TAM_iniciais - tiposSimulados[i].iniciais.length));
+                formato = formato.replace("{4}", tiposSimulados[i].descricao.trim() + " ".repeat(TAM_descricao - tiposSimulados[i].descricao.trim().length));
+                conteudo += formato;
+            }
+
+            let TAM_questaoId = 0;
+            let TAM_enunciado = 0;
+            for (let i = 0; i < cargaImportacao.length; i++)
+            {
+                if (cargaImportacao[i].id.toString().length > TAM_questaoId) { TAM_questaoId = cargaImportacao[i].id.toString().length; }
+                if (cargaImportacao[i].enunciado.length > TAM_enunciado)     { TAM_enunciado = cargaImportacao[i].enunciado.length;     }
+            }
+
+            for (let i = 0; i < questoesBD.length; i++) { questoesIDs.push(questoesBD[i].id); }
+            //let _id = 0;
+            //let _questaoId = await getNextId();
+            conteudo += "\n\nvar carga_questoes = [];\n";
+
+            for (let i = 0; i < cargaImportacao.length; i++)
+            {
+                if (!tiposSimuladosIDs.includes(parseInt(cargaImportacao[i].tipoSimuladoId)))
                 {
                     qtdInvalidos++;
                 }
                 else
                 {
-                    questoesNovas.push(questoes[i]);
-                    if (questoesIDs.includes(parseInt(questoes[i].id)))
+                    if (cargaImportacao[i].opcoesRespostas.length < 2 || cargaImportacao[i].opcoesRespostas.length > 5)
                     {
-                        //_id = parseInt(questoes[i].id);
-                        qtdAtualizacoes++;
+                        qtdInvalidos++;
                     }
                     else
                     {
-                        //_id = _questaoId;
-                        //questoes[i].id = _questaoId;
-                        //_questaoId++;
-                        qtdCadastros++;
-                    }
-                    /*let formatoTS = formatoTxtTipoSimulado.replace("{0}", " ".repeat(TAM_tipoSimuladoId - _tipoSimulado.id.toString().length) + _tipoSimulado.id.toString())
-                                                        .replace("{1}", _tipoSimulado.descricao.trim() + " ".repeat(TAM_descricao - _tipoSimulado.descricao.trim().length))
-                                                        .replace("{2}", _tipoSimulado.rgbFonte + " ".repeat(TAM_rgbFonte - _tipoSimulado.rgbFonte.length))
-                                                        .replace("{3}", _tipoSimulado.rgbFundo + " ".repeat(TAM_rgbFundo - _tipoSimulado.rgbFundo.length))
-                                                        .replace("{4}", _tipoSimulado.iniciais + " ".repeat(TAM_iniciais - _tipoSimulado.iniciais.length));
+                        let questaoValida = new Questao();
+                        questaoValida.id = cargaImportacao[i].id;
+                        questaoValida.enunciado = cargaImportacao[i].enunciado;
+                        questaoValida.gabarito  = cargaImportacao[i].gabarito;
+                        questaoValida.tipoSimulado = tiposSimulados.find(x => x.id == parseInt(cargaImportacao[i].tipoSimuladoId));
+                        questaoValida.opcoesRespostas = cargaImportacao[i].opcoesRespostas;
+                        questoesValidas.push(questaoValida);
+                        if (questoesIDs.includes(parseInt(cargaImportacao[i].id)))
+                        {
+                            //_id = parseInt(cargaImportacao[i].id);
+                            qtdAtualizacoes++;
+                        }
+                        else
+                        {
+                            //_id = _questaoId;
+                            //cargaImportacao[i].id = _questaoId;
+                            //_questaoId++;
+                            qtdCadastros++;
+                        }
+                        /*let formatoTS = formatoTxtTipoSimulado.replace("{0}", " ".repeat(TAM_tipoSimuladoId - _tipoSimulado.id.toString().length) + _tipoSimulado.id.toString())
+                                                                .replace("{1}", _tipoSimulado.descricao.trim() + " ".repeat(TAM_descricao - _tipoSimulado.descricao.trim().length))
+                                                                .replace("{2}", _tipoSimulado.rgbFonte + " ".repeat(TAM_rgbFonte - _tipoSimulado.rgbFonte.length))
+                                                                .replace("{3}", _tipoSimulado.rgbFundo + " ".repeat(TAM_rgbFundo - _tipoSimulado.rgbFundo.length))
+                                                                .replace("{4}", _tipoSimulado.iniciais + " ".repeat(TAM_iniciais - _tipoSimulado.iniciais.length));
 
-                    let formatoOR = "";
-                    for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
-                    {
-                        formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
-                                                            .replace("{1}", questoes[i].opcoesRespostas[j].opcao)
-                                                            .replace("{2}", questoes[i].opcoesRespostas[j].descricao);
-                    }
-                    formatoOR += "\n" + identacao2;
+                        let formatoOR = "";
+                        for (let j = 0; j < cargaImportacao[i].opcoesRespostas.length; j++)
+                        {
+                            formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
+                                                                .replace("{1}", cargaImportacao[i].opcoesRespostas[j].opcao)
+                                                                .replace("{2}", cargaImportacao[i].opcoesRespostas[j].descricao);
+                        }
+                        formatoOR += "\n" + identacao2;
 
-                    let formato = formatoTxtQuestao.replace("{0}", _id)
-                                                .replace("{1}", questoes[i].enunciado.trim() + " ".repeat(TAM_enunciado - questoes[i].enunciado.trim().length))
-                                                .replace("{2}", formatoTS)
-                                                .replace("{3}", questoes[i].gabarito)
-                                                .replace("{4}", identacao1)
-                                                .replace("{5}", formatoOR);
-                    //_id++;
-                    conteudo += formato;*/
+                        let formato = formatoTxtQuestao.replace("{0}", _id)
+                                                       .replace("{1}", cargaImportacao[i].enunciado.trim() + " ".repeat(TAM_enunciado - cargaImportacao[i].enunciado.trim().length))
+                                                       .replace("{2}", formatoTS)
+                                                       .replace("{3}", cargaImportacao[i].gabarito)
+                                                       .replace("{4}", identacao1)
+                                                       .replace("{5}", formatoOR);
+                        //_id++;
+                        conteudo += formato;*/
+                    }
                 }
             }
+
+            //console.log("questoesIDs    : " + questoesIDs);
+            //let x = "questoesValidas: ";
+            //for (let i = 0; i < questoesValidas.length; i++)
+            //    x += questoesValidas[i].id + ",";
+            //console.log(x.trim().substring(0, x.length-1));
+
+            let resultadoBulkWrite = 0;
+            if (opcao == 0)
+            {
+                const _bulkWrite = await Questao.bulkWrite(
+                                    questoesValidas.map(questao =>
+                                    ({
+                                        updateOne:
+                                        {
+                                            filter: { id: questao.id },
+                                            update: { $set: { enunciado: questao.enunciado,
+                                                              gabarito: questao.gabarito,
+                                                              tipoSimulado: questao.tipoSimulado,
+                                                              opcoesRespostas: questao.opcoesRespostas }
+                                                    },
+                                            upsert: true
+                                        }
+                                    })));
+                //console.log(_bulkWrite);
+                resultadoBulkWrite += _bulkWrite.insertedCount;
+                resultadoBulkWrite += _bulkWrite.matchedCount;
+                resultadoBulkWrite += _bulkWrite.modifiedCount;
+                resultadoBulkWrite += _bulkWrite.deletedCount;
+                resultadoBulkWrite += _bulkWrite.upsertedCount;
+            }
+
+            if (resultadoBulkWrite == 0)
+                mensagem = "Não houve inclusão/atualização de dados.";
+            else
+            {
+                mensagem = "Importação realizada com sucesso.";
+
+                // Limpando o conteúdo do arquivo
+                await fs.promises.writeFile(caminhoArquivo, "", "utf8");
+
+                // Adiciona conteúdo a um arquivo existente
+                fs.appendFile(caminhoArquivo, conteudo, (err) =>
+                {
+                    if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
+                });
+            }
+
+            sucesso = true; 
         }
-
-        /*if (opcao == 0)
+        catch (err)
         {
-            const resultado = await Questao.bulkWrite(
-                                questoesNovas.map(questao =>
-                                ({
-                                    updateOne:
-                                    {
-                                        filter: { enunciado: questao.enunciado.trim() },
-                                        update: { $set: questao },
-                                        upsert: true
-                                    }
-                                }))
-            );
-            //console.log(resultado);
-        }*/
-   
-        // Limpando o conteúdo do arquivo
-        await fs.promises.writeFile(filePathQuestoes, "", "utf8");
-
-        // Adiciona conteúdo a um arquivo existente
-        fs.appendFile(filePathQuestoes, conteudo, (err) =>
-        {
-            if (err) { mensagem = "Erro ao adicionar conteúdo ao arquivo:" + err; }
-        });
-
-        return ({ sucesso: true, mensagem, qtd_registros: questoes.length, qtd_cadastros: qtdCadastros, qtd_atualizacoes: qtdAtualizacoes, qtd_invalidos: qtdInvalidos });
+            sucesso = false; mensagem = err.message;
+        }
     }
-    catch (err)
-    {
-        return ({ sucesso: false, mensagem: err.message, qtd_registros: 0, qtd_cadastros: 0, qtd_atualizacoes: 0, qtd_invalidos: 0 });
-    }
+    resultado = {
+                  sucesso, mensagem, 
+                  qtd_registros: cargaImportacao.length, 
+                  qtd_cadastros: qtdCadastros,
+                  qtd_atualizacoes: qtdAtualizacoes,
+                  qtd_invalidos: qtdInvalidos
+                };
+    return (resultado);
 }
 
 // POST
@@ -347,7 +390,7 @@ router.post('/excel', async (req, res) =>
         if (req.body.enunciado != null)    { registro.enunciado = req.body.enunciado; }
         if (req.body.tipoSimulado != null)
             registro.tipoSimulado = new TipoSimulado({ id: req.body.tipoSimulado, rgbFonte: null, rgbFundo: null,
-                                                        iniciais: null, descricao: null });
+                                                       iniciais: null, descricao: null });
         registro.opcoesRespostas = (req.body.opcoesRespostas != null) ? req.body.opcoesRespostas : [];
 
         for (let i = 0; i < workbook.SheetNames.length; i++)
@@ -376,6 +419,7 @@ router.post('/excel', async (req, res) =>
 
         // Salva o arquivo Excel com as alterações
         XLSX.writeFile(workbook, nomeArquivo2);
+
         console.log('Dados inseridos e arquivo atualizado com sucesso!');*/
 
         res.json({ message: mensagem, resultado });
