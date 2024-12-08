@@ -473,6 +473,10 @@ router.post('/excelAndImport', async (req, res) =>
     const caminhoArquivo = path.join(dirPath, "carga_teste.xlsx"); // Caminho completo do arquivo
     const ExcelJS        = require('exceljs');
     const workbook       = new ExcelJS.Workbook();
+    const tiposSimulados = await TipoSimulado.find();
+    let questoes         = [];
+    let questoesID       = [];
+
     try
     {
         // Carrega a planilha
@@ -487,9 +491,53 @@ router.post('/excelAndImport', async (req, res) =>
                 let _values = "[ ";
                 for (let i = 1; i < row.values.length; i++) { _values += "'" + row.values[i] + "', "; }
                 _values = _values.substring(0, _values.length-2) + " ]";
-                console.log(`Linha ${rowIndex}:`, _values);
+                /*console.log(`Linha ${rowIndex}:`, _values);*/
+
+                let questao             = new Questao();
+                questao.id              = row.values[1];
+                let _tipoSimulado       = tiposSimulados[0];
+                questao.gabarito        = row.values[3];
+                questao.enunciado       = row.values[4];
+                questao.tipoSimulado    = _tipoSimulado;
+                questao.opcoesRespostas = [];
+                questoes.push(questao);
+                questoesID.push(questao.id);
             }
         });
+
+        const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
+        const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
+        const formatoTxtOpcaoResposta = "\n{0}{ \"opcao\": \"{1}\", \"descricao\": \"{2}\" },";
+        const identacao1        = " ".repeat(23);
+        const identacao2        = " ".repeat(42);
+        const identacao3        = " ".repeat(44);
+        let conteudo = "";
+        for (let i = 0; i < questoes.length; i++)
+        {
+            const _tipoSimulado = questoes[i].tipoSimulado;
+            let formatoTS = formatoTxtTipoSimulado.replace("{0}", _tipoSimulado.id.toString())
+                                                  .replace("{1}", _tipoSimulado.descricao)
+                                                  .replace("{2}", _tipoSimulado.rgbFonte)
+                                                  .replace("{3}", _tipoSimulado.rgbFundo)
+                                                  .replace("{4}", _tipoSimulado.iniciais);
+
+            let formatoOR = "";
+            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
+            {
+                formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
+                                                    .replace("{1}", cargaImportacao[i].opcoesRespostas[j].opcao)
+                                                    .replace("{2}", cargaImportacao[i].opcoesRespostas[j].descricao);
+            }
+            formatoOR += "\n" + identacao2;
+
+            conteudo += formatoTxtQuestao.replace("{0}", questoes[i].id)
+                                         .replace("{1}", questoes[i].enunciado)
+                                         .replace("{2}", formatoTS)
+                                         .replace("{3}", questoes[i].gabarito)
+                                         .replace("{4}", identacao1)
+                                         .replace("{5}", formatoOR);
+        }
+        console.log(conteudo);
 
         const abaOpcoesResposta = workbook.worksheets.find(x => x.name == "Opçoes de Resposta de Questões");
         abaOpcoesResposta.eachRow((row, rowIndex) =>
@@ -499,7 +547,7 @@ router.post('/excelAndImport', async (req, res) =>
                 let _values = "[ ";
                 for (let i = 1; i < row.values.length; i++) { _values += "'" + row.values[i] + "', "; }
                 _values = _values.substring(0, _values.length-2) + " ]";
-                console.log(`Linha ${rowIndex}:`, _values);    
+                /*console.log(`Linha ${rowIndex}:`, _values);    */
             }
         });
         res.status(201).json({ sucesso: true, message: "Importação realizada com sucesso." });
