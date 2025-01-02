@@ -6,6 +6,8 @@ const Resposta         = require('../models/Resposta');
 const mensagemNotFound = "Registro não encontrado.";
 const mensagemSuccess  = "Dados salvos com sucesso.";
 const chr              = 65;
+const path             = require('path');
+const dirPath          = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
 
 // GET
 router.get('/', async (req, res) =>
@@ -160,8 +162,8 @@ router.delete('/:id', async (req, res) =>
 
 async function getNextId()
 {
-	const lastId = await Questao.findOne().sort({ id: -1 });
-	return lastId ? lastId.id + 1 : 1;
+      const lastId = await Questao.findOne().sort({ id: -1 });
+      return lastId ? lastId.id + 1 : 1;
 }
 
 // POST
@@ -176,8 +178,7 @@ async function doImport(cargaImportacao, opcao)
     let resultado = null;
     let sucesso   = true;
     let mensagem  = "";
-    let qtdCadastros = 0, qtdAtualizacoes = 0, qtdInvalidos = 0;
-    console.log(cargaImportacao.length);
+    let qtdCadastros = 0, qtdAtualizacoes = 0, qtdInvalidos = [0, 0];
     if (cargaImportacao.length == 0)
     {
         sucesso = false; mensagem = "Carga de importação vazia!";
@@ -186,8 +187,6 @@ async function doImport(cargaImportacao, opcao)
     {
         try
         {
-            const path              = require('path');
-            const dirPath           = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
             const caminhoArquivo    = path.join(dirPath, "questoes_teste.js"); // Caminho completo do arquivo "questoes.js"
             const fs                = require('fs');
             const identacao1        = " ".repeat(23);
@@ -248,17 +247,11 @@ async function doImport(cargaImportacao, opcao)
             for (let i = 0; i < cargaImportacao.length; i++)
             {
                 if (!tiposSimuladosIDs.includes(parseInt(cargaImportacao[i].tipoSimuladoId)))
-                {
-                    qtdInvalidos++;
-                    //qtdInvalidos.push(cargaImportacao[i].id + " - tiposSimuladosIDs - " + cargaImportacao[i].tipoSimuladoId);
-                }
+                    qtdInvalidos[0]++;
                 else
                 {
                     if (cargaImportacao[i].opcoesRespostas.length < 2 || cargaImportacao[i].opcoesRespostas.length > 5)
-                    {
-                        qtdInvalidos++;
-                        //qtdInvalidos.push(cargaImportacao[i].id + "opcoesRespostas");
-                    }
+                        qtdInvalidos[1]++;
                     else
                     {
                         let questaoValida = new Questao();
@@ -307,12 +300,6 @@ async function doImport(cargaImportacao, opcao)
                     }
                 }
             }
-
-            //console.log("questoesIDs    : " + questoesIDs);
-            //let x = "questoesValidas: ";
-            //for (let i = 0; i < questoesValidas.length; i++)
-            //    x += questoesValidas[i].id + ",";
-            //console.log(x.trim().substring(0, x.length-1));
 
             let resultadoBulkWrite = 0;
             if (opcao == 0)
@@ -367,7 +354,7 @@ async function doImport(cargaImportacao, opcao)
                   qtd_registros: cargaImportacao.length, 
                   qtd_cadastros: qtdCadastros,
                   qtd_atualizacoes: qtdAtualizacoes,
-                  qtd_invalidos: qtdInvalidos
+                  qtd_invalidos: (qtdInvalidos[0] + " com tipo de simulado inválido / " + qtdInvalidos[1] + " com quantidade de opções de resposta menor que 2 ou maior que 5.")
                 };
     return (resultado);
 }
@@ -389,12 +376,12 @@ router.post('/excel', async (req, res) =>
         const abaCategorias = workbook.addWorksheet("Categorias");
         abaCategorias.columns =
         [
-            { width: 20, key: "coluna1", header: "num_categoria" },
-            { width: 15, key: "coluna2", header: "cod_categoria" },
+            { width: 20, key: "coluna1", header: "num_categoria"   },
+            { width: 15, key: "coluna2", header: "cod_categoria"   },
             { width: 25, key: "coluna3", header: "dsc_largura_aba" },
-            { width: 15, key: "coluna4", header: "dsc_cor_borda" },
-            { width: 15, key: "coluna5", header: "dsc_cor_fundo" },
-            { width: 25, key: "coluna6", header: "dsc_categoria" }
+            { width: 15, key: "coluna4", header: "dsc_cor_borda"   },
+            { width: 15, key: "coluna5", header: "dsc_cor_fundo"   },
+            { width: 25, key: "coluna6", header: "dsc_categoria"   }
         ];
         abaCategorias.getRow(1).height = 13; abaCategorias.getRow(1).font = fonteSheet1;
 
@@ -407,39 +394,58 @@ router.post('/excel', async (req, res) =>
         }
 
         // Cria a segunda aba com fonte personalizada
-        const sheet2 = workbook.addWorksheet('Produtos');
-        sheet2.columns = 
+        const abaProdutos = workbook.addWorksheet("Produtos");
+        abaProdutos.columns = 
         [
-            { header: 'Produto', key: 'produto', width: 25 },
-            { header: 'Quantidade', key: 'quantidade', width: 15 },
-            { header: 'Preço', key: 'preco', width: 10 }
+            { width: 25, key: "produto",    header: "Produto"    },
+            { width: 15, key: "quantidade", header: "Quantidade" },
+            { width: 10, key: "preco",      header: "Preço"      }
         ];
-        sheet2.addRow({ produto: 'Caderno', quantidade: 10, preco: 5.50 });
-        sheet2.addRow({ produto: 'Caneta', quantidade: 20, preco: 2.00 });
-        sheet2.getRow(1).font = fonteSheet1;
+        abaProdutos.addRow({ produto: 'Caderno', quantidade: 10, preco: 5.50 });
+        abaProdutos.addRow({ produto: 'Caneta', quantidade: 20, preco: 2.00 });
+        abaProdutos.getRow(1).font = fonteSheet1;
 
+        const abaQuestoes = workbook.addWorksheet("Questões de Concursos");
+        abaQuestoes.columns = 
+        [
+            { width: 10, key: "cod_questao",       header: "cod_questao"       },
+            { width: 10, key: "cod_tipo_simulado", header: "cod_tipo_simulado" },
+            { width: 50, key: "enunciado",         header: "enunciado"         },
+            { width: 10, key: "gabarito",          header: "gabarito"          }
+        ];
+
+        const abaOpcoesRespostas = workbook.addWorksheet("Opçoes de Resposta de Questões");
+        abaOpcoesRespostas.columns = 
+        [
+            { width: 10, key: "cod_questao", header: "cod_questao" },
+            { width: 10, key: "cod_opcao",   header: "cod_opcao"   },
+            { width: 50, key: "descricao",   header: "descricao"   }
+        ];
+
+        const questoes = await Questao.find();
+        for (let i = 0; i < questoes.length; i++)
+        {
+            const registro = questoes[i];
+            if (registro.tipoSimulado != null)
+            {
+                abaQuestoes.addRow({ cod_questao: registro.id.toString(),
+                                     cod_tipo_simulado: registro.tipoSimulado.id.toString(),
+                                     enunciado: registro.enunciado,
+                                     gabarito: registro.gabarito });
+    
+                for (let j = 0; j < registro.opcoesRespostas.length; j++)
+                {
+                    abaOpcoesRespostas.addRow({ cod_questao: registro.id,
+                                                cod_opcao: registro.opcoesRespostas[j].opcao,
+                                                descricao: registro.opcoesRespostas[j].descricao });
+                }
+            }
+        }
+ 
         // Salva o arquivo
-        workbook.xlsx.writeFile('carga20241118.xlsx');
+        workbook.xlsx.writeFile(dirPath + "\\nova_carga.xlsx");
 
-        /*const registro = new Questao();
-        const extensaoArquivo = "xlsx";
-        const nomeArquivo2 = "carga_teste." + extensaoArquivo;
-        const XLSX = require(extensaoArquivo);
-
-        // Lê o arquivo Excel existente
-        const workbook = XLSX.readFile(nomeArquivo2);
-        const worksheetQuestions = "Questões de Concursos";
-        const worksheetQuestionAnswers = "Opções de Resposta de Questões";
-        //["cod_questao", "cod_resposta", "dsc_opcao_resposta"]
-
-        if (req.body.id != null)           { registro.id = req.body.id; }
-        if (req.body.gabarito != null)     { registro.gabarito = req.body.gabarito; }
-        if (req.body.enunciado != null)    { registro.enunciado = req.body.enunciado; }
-        if (req.body.tipoSimulado != null)
-            registro.tipoSimulado = new TipoSimulado({ id: req.body.tipoSimulado, rgbFonte: null, rgbFundo: null,
-                                                       iniciais: null, descricao: null });
-        registro.opcoesRespostas = (req.body.opcoesRespostas != null) ? req.body.opcoesRespostas : [];
-
+        /*
         for (let i = 0; i < workbook.SheetNames.length; i++)
         {
             const worksheet = workbook.Sheets[worksheetQuestions];
@@ -468,89 +474,52 @@ router.post('/excel', async (req, res) =>
 // POST
 router.post('/excelAndImport', async (req, res) =>
 {
-    const path           = require('path');
-    const dirPath        = path.join(__dirname, "..", "..", "..", "..", "Minha Estante (HTML 5)", "carga");
-    const caminhoArquivo = path.join(dirPath, "carga_teste.xlsx"); // Caminho completo do arquivo
+    const caminhoArquivo = path.join(dirPath, "carga.xlsx"); // Caminho completo do arquivo
     const ExcelJS        = require('exceljs');
     const workbook       = new ExcelJS.Workbook();
-    const tiposSimulados = await TipoSimulado.find();
     let questoes         = [];
-    let questoesID       = [];
-
     try
     {
         // Carrega a planilha
         await workbook.xlsx.readFile(caminhoArquivo);
         
-        // Itera pelas abas de questões e opções de respostas
-        const abaQuestoes = workbook.worksheets.find(x => x.name == "Questões de Concursos");
-        abaQuestoes.eachRow((row, rowIndex) =>
+        const abaQuestoes = workbook.getWorksheet("Questões de Concursos");
+        const abaOpcoesRespostaLinhas = workbook.getWorksheet("Opçoes de Resposta de Questões");
+        let resultado = { sucesso: false, message: "Abas 'Questões de Concursos' e 'Opçoes de Resposta de Questões' não encontradas." };
+
+        if (abaQuestoes && abaOpcoesRespostaLinhas) // ambas as abas devem ser existentes
         {
-            if (rowIndex > 1)
+            // Itera pelas abas de questões e opções de respostas
+            const abaQuestoes = workbook.getWorksheet("Questões de Concursos");
+            abaQuestoes.eachRow((row, rowIndex) =>
             {
-                let _values = "[ ";
-                for (let i = 1; i < row.values.length; i++) { _values += "'" + row.values[i] + "', "; }
-                _values = _values.substring(0, _values.length-2) + " ]";
-                /*console.log(`Linha ${rowIndex}:`, _values);*/
-
-                let questao             = new Questao();
-                questao.id              = row.values[1];
-                let _tipoSimulado       = tiposSimulados[0];
-                questao.gabarito        = row.values[3];
-                questao.enunciado       = row.values[4];
-                questao.tipoSimulado    = _tipoSimulado;
-                questao.opcoesRespostas = [];
-                questoes.push(questao);
-                questoesID.push(questao.id);
-            }
-        });
-
-        const formatoTxtTipoSimulado  = "{ \"id\": {0}, \"descricao\": \"{1}\", \"rgbFonte\": \"{2}\", \"rgbFundo\": \"{3}\", \"iniciais\": \"{4}\" }";
-        const formatoTxtQuestao       = "\ncarga_questoes.push( { \"id\": {0}, \"enunciado\": \"{1}\", \"tipoSimulado\": {2}, \"gabarito\": \"{3}\",\n{4}\"opcoesRespostas\": [{5}] } );";
-        const formatoTxtOpcaoResposta = "\n{0}{ \"opcao\": \"{1}\", \"descricao\": \"{2}\" },";
-        const identacao1        = " ".repeat(23);
-        const identacao2        = " ".repeat(42);
-        const identacao3        = " ".repeat(44);
-        let conteudo = "";
-        for (let i = 0; i < questoes.length; i++)
-        {
-            const _tipoSimulado = questoes[i].tipoSimulado;
-            let formatoTS = formatoTxtTipoSimulado.replace("{0}", _tipoSimulado.id.toString())
-                                                  .replace("{1}", _tipoSimulado.descricao)
-                                                  .replace("{2}", _tipoSimulado.rgbFonte)
-                                                  .replace("{3}", _tipoSimulado.rgbFundo)
-                                                  .replace("{4}", _tipoSimulado.iniciais);
-
-            let formatoOR = "";
-            for (let j = 0; j < questoes[i].opcoesRespostas.length; j++)
+                if (rowIndex > 1)
+                {
+                    let questao             = new Questao();
+                    questao.id              = row.values[1];
+                    questao.tipoSimuladoId  = row.values[2];
+                    questao.gabarito        = row.values[3];
+                    questao.enunciado       = row.values[4];
+                    questao.opcoesRespostas = [];
+                    questoes.push(questao);
+                }
+            });
+            for (let i = 0; i < questoes.length; i++)
             {
-                formatoOR += formatoTxtOpcaoResposta.replace("{0}", identacao3)
-                                                    .replace("{1}", cargaImportacao[i].opcoesRespostas[j].opcao)
-                                                    .replace("{2}", cargaImportacao[i].opcoesRespostas[j].descricao);
+                abaOpcoesRespostaLinhas.eachRow((row, rowIndex) =>
+                {
+                    if (rowIndex > 1 && parseInt(row.values[1]) == parseInt(questoes[i].id))
+                    {
+                        let opcaoResposta       = new Resposta();
+                        opcaoResposta.opcao     = row.values[2];
+                        opcaoResposta.descricao = row.values[3];
+                        questoes[i].opcoesRespostas.push(opcaoResposta);
+                    }
+                });
             }
-            formatoOR += "\n" + identacao2;
-
-            conteudo += formatoTxtQuestao.replace("{0}", questoes[i].id)
-                                         .replace("{1}", questoes[i].enunciado)
-                                         .replace("{2}", formatoTS)
-                                         .replace("{3}", questoes[i].gabarito)
-                                         .replace("{4}", identacao1)
-                                         .replace("{5}", formatoOR);
+            resultado = await doImport(questoes, 0);
         }
-        console.log(conteudo);
-
-        const abaOpcoesResposta = workbook.worksheets.find(x => x.name == "Opçoes de Resposta de Questões");
-        abaOpcoesResposta.eachRow((row, rowIndex) =>
-        {
-            if (rowIndex > 1)
-            {
-                let _values = "[ ";
-                for (let i = 1; i < row.values.length; i++) { _values += "'" + row.values[i] + "', "; }
-                _values = _values.substring(0, _values.length-2) + " ]";
-                /*console.log(`Linha ${rowIndex}:`, _values);    */
-            }
-        });
-        res.status(201).json({ sucesso: true, message: "Importação realizada com sucesso." });
+        res.json(resultado);
     }
     catch (err)
     {
