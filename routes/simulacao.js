@@ -13,7 +13,7 @@ router.get('/', async (req, res) =>
         const registros = await Simulacao.find();
         /*
         const dataFormatada = new Intl.DateTimeFormat('pt-BR', { day: '2-digit',
-                                                                month: '2-digit', 
+                                                                month: '2-digit',
                                                                 year: 'numeric' 
                                                                 }).format(dataAtual);
         */
@@ -24,6 +24,7 @@ router.get('/', async (req, res) =>
         res.status(500).json({ message: err.message });
     }
 });
+
 
 // GET/:id
 router.get('/:id', async (req, res) =>
@@ -50,20 +51,21 @@ router.post('/', async (req, res) =>
         let mensagem = mensagemSuccess;
         registro.data = new Date();
         registro.id = await getNextId();
-        registro.itensSimulacao = [];
-        for (let i = 0; i < req.body.itensSimulacao.length; i++)
+        registro.itensSimulacoes = [];
+
+        for (let i = 0; i < req.body.itensSimulacoes.length; i++)
         {
             let itemSimulacao            = new ItemSimulacao();
-            itemSimulacao.id             = req.body.itensSimulacao[i].id;
-            itemSimulacao.idQuestao      = req.body.itensSimulacao[i].idQuestao;
-            itemSimulacao.opcaoCorreta   = req.body.itensSimulacao[i].opcaoCorreta;
-            itemSimulacao.opcaoEscolhida = req.body.itensSimulacao[i].opcaoEscolhida;
-            registro.itensSimulacao.push(itemSimulacao);
+            let dados = req.body.itensSimulacoes[i].split(' ');
+            itemSimulacao.id             = (i + 1);
+            itemSimulacao.idQuestao      = parseInt(dados[0]);
+            itemSimulacao.opcaoCorreta   = dados[1];
+            itemSimulacao.opcaoEscolhida = dados[2];
+            registro.itensSimulacoes.push(itemSimulacao);
         }
         const resultado = await registro.save();
         const registros = await Simulacao.find();
         //const dadosImportacao = await doImport(registros, 4);
-
         res.status(201).json({ message: mensagem, registro });
     }
     catch (err)

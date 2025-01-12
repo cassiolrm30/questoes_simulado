@@ -10,4 +10,4 @@ const SCHEMA = new mongoose.Schema
 
 { timestamps: true, versionKey: false });
 
-module.exports = mongoose.model("simulacoes", SCHEMA);
+module.exports = mongoose.model("itens_simulacoes", SCHEMA);
