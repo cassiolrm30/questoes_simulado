@@ -35,6 +35,8 @@ router.get('/', async (req, res) =>
             { $sort:  { _id: 1 } }
         ]);
 
+        const simulacoesPorTipoSimulado = await doSimulacaoPorTipoSimulacao();
+
         /*
         const resultado = await Questao.aggregate
                                 ([
@@ -66,11 +68,33 @@ router.get('/', async (req, res) =>
                                  ]);
         */
 
-        res.json({ simulacoesPorMesAno, qtdSimulacoesValidas, questoesPorTipoSimulado });
+        res.json({ simulacoesPorMesAno, qtdSimulacoesValidas, questoesPorTipoSimulado, simulacoesPorTipoSimulado });
     }
     catch (err)
     {
         res.status(500).json({ message: err.message });
     }
 });
+
+async function doSimulacaoPorTipoSimulacao()
+{
+    let resultado = null;
+
+    try
+    {
+        //const questoesBD = await ItemSimulacao.find(null, { id: 1 }).sort({ id: 1 });
+        resultado = await ItemSimulacao.aggregate
+        ([
+            { $group: { _id: "$idQuestao", quantidade: { $sum: 1 } } },
+            { $sort:  { _id: 1 } }
+        ]);
+    }
+    catch (err)
+    {
+
+    }
+
+    return (resultado);
+}
+    
 module.exports = router;
